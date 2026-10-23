@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ code }}{% endblock %}
+{% block bodyclass %}center{% endblock %}
+{% block body %}
+<main class="login card center-text">
+  <p class="eyebrow">{{ code }}</p>
+  <h1>{{ text }}</h1>
+  <p><a class="btn" href="{{ url_for('public') }}">To the home page</a></p>
+</main>
+{% endblock %}

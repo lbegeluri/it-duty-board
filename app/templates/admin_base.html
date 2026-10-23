@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block bodyclass %}admin{% endblock %}
+{% block body %}
+<div class="shell">
+  <nav class="side" aria-label="Main menu">
+    <div class="brand"><span class="side-logo">{% include "_logo_teal.svg" %}</span><b>IT Duty</b></div>
+    <a href="{{ url_for('schedule') }}"   class="{{ 'on' if active == 'schedule' }}">Schedule</a>
+    <a href="{{ url_for('staff_list') }}" class="{{ 'on' if active == 'staff' }}">Staff</a>
+    {% if user and user.role == 'owner' %}
+      <a href="{{ url_for('users') }}"    class="{{ 'on' if active == 'users' }}">Users</a>
+    {% endif %}
+    <a href="{{ url_for('settings') }}"   class="{{ 'on' if active == 'settings' }}">Settings</a>
+    <a href="{{ url_for('audit_log') }}"  class="{{ 'on' if active == 'audit' }}">Audit log</a>
+    <div class="side-foot">
+      <a href="{{ url_for('public') }}">Public page</a>
+      <form method="post" action="{{ url_for('logout') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf() }}">
+        <button class="link" type="submit">Log out ({{ user.username }})</button>
+      </form>
+    </div>
+  </nav>
+  <section class="content">
+    {% block content %}{% endblock %}
+  </section>
+</div>
+{% endblock %}

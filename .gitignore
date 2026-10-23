@@ -1,0 +1,26 @@
+# secrets and data: never commit
+*.db
+*.db-wal
+*.db-shm
+*.key
+*.pem
+*.crt
+*.cer
+*.csr
+secret.key
+.env
+data/
+backups/
+vm/duty.conf
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv*/
+
+# editor / OS / tooling
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

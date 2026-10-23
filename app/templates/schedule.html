@@ -1,0 +1,195 @@
+{% extends "admin_base.html" %}
+{% block title %}Schedule{% endblock %}
+{% macro staff_options(with_data) %}
+  <optgroup label="Site A">{% for s in site_a_staff %}<option value="{{ s.id }}"{% if with_data %} data-branch="site_a"{% endif %}>{{ s.name }}</option>{% endfor %}</optgroup>
+  <optgroup label="Site B">{% for s in site_b_staff %}<option value="{{ s.id }}"{% if with_data %} data-branch="site_b"{% endif %}>{{ s.name }}</option>{% endfor %}</optgroup>
+{% endmacro %}
+{% macro chips(list, cls, key) %}
+  {% for s in list %}
+    <button type="button" class="chip {{ cls }}" draggable="true" data-staff-id="{{ s.id }}" data-name="{{ s.name }}" data-branch="{{ key }}">
+      <span>{{ s.name }}</span><em title="Days in this period">{{ counts.get(s.id, 0) }}</em>
+    </button>
+  {% endfor %}
+{% endmacro %}
+{% macro lines(list, cls, branch, can) %}{% for p in list %}<button type="button" class="ln {{ cls }}{% if not can %} ro{% endif %}" data-branch="{{ branch }}" data-staff="{{ p.id }}" title="{{ p.name }}">{{ p.name|short }}</button>{% else %}<button type="button" class="ln {{ cls }} x{% if not can %} ro{% endif %}" data-branch="{{ branch }}" data-staff="">—</button>{% endfor %}{% endmacro %}
+{% block content %}
+<header class="bar">
+  <h1>Schedule</h1>
+  <div class="actions">
+    <button class="btn" type="button" data-open="dlg-import">Paste list</button>
+    <button class="btn" type="button" data-open="dlg-export">Export to Excel</button>
+    <button class="btn" type="button" id="multi-toggle" aria-pressed="false">Select several days</button>
+    <button class="btn" type="button" id="swap-toggle" aria-pressed="false">Swap days</button>
+    <button class="btn" type="button" data-open="dlg-range">Assign period</button>
+    <form method="post" action="{{ url_for('schedule_copy_week') }}" data-confirm="Last week's duty people will be copied to this week. Continue?">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <input type="hidden" name="view" value="{{ view }}">
+      <input type="hidden" name="d" value="{{ anchor.isoformat() }}">
+      <button class="btn" type="submit">Copy last week</button>
+    </form>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="seg" role="group" aria-label="View">
+    <a class="{{ 'on' if view == 'month' }}" href="{{ url_for('schedule', view='month', d=anchor.isoformat()) }}">Month</a>
+    <a class="{{ 'on' if view == 'week' }}"  href="{{ url_for('schedule', view='week',  d=anchor.isoformat()) }}">Week</a>
+  </div>
+  <div class="nav">
+    <a class="btn icon" href="{{ url_for('schedule', view=view, d=prev_d.isoformat()) }}" aria-label="Previous">‹</a>
+    <b class="cal-title">{{ title }}</b>
+    <a class="btn icon" href="{{ url_for('schedule', view=view, d=next_d.isoformat()) }}" aria-label="Next">›</a>
+    <a class="btn" href="{{ url_for('schedule', view=view, d=today.isoformat()) }}">Today</a>
+  </div>
+</div>
+
+<p class="hint" id="hint" role="status" hidden></p>
+<div class="bulkbar" id="bulkbar" hidden>
+  <b id="bulk-count"></b>
+  <select id="bulk-staff" aria-label="Person">
+    <option value="" disabled selected>Choose a person</option>
+    {{ staff_options(false) }}
+  </select>
+  <button class="btn primary" type="button" id="bulk-assign">Assign</button>
+  <button class="btn danger" type="button" id="bulk-clear-site_a">Unassign Site A</button>
+  <button class="btn danger" type="button" id="bulk-clear-site_b">Unassign Site B</button>
+  <button class="btn" type="button" id="bulk-cancel">Cancel</button>
+</div>
+<div class="sched">
+<aside class="palette" id="palette" aria-label="People">
+  <h2>People</h2>
+  <p class="muted small">Click a name, then a day: the person is added on the line of their own site. Or drag a name onto a day. To tick several people for one day, click the day's line without choosing a name first.</p>
+  <div class="chips">
+    <h3 class="gh e">Site A</h3>
+    {{ chips(site_a_staff, 'e', 'site_a') }}
+    <h3 class="gh w">Site B</h3>
+    {{ chips(site_b_staff, 'w', 'site_b') }}
+    {% if free_staff %}
+      <h3 class="gh n">No site chosen</h3>
+      {% for s in free_staff %}<span class="chip n" title="Choose a site on the Staff page first"><span>{{ s.name }}</span></span>{% endfor %}
+    {% endif %}
+    <button type="button" class="chip clear" data-staff-id="" data-name="Unassign" data-branch=""><span>Unassign</span></button>
+  </div>
+</aside>
+<div class="cal" role="grid">
+  {% for n in weekdays_short %}<div class="dow{% if loop.index > 5 %} c{% endif %}" role="columnheader">{{ n }}</div>{% endfor %}
+  {% for c in cells %}
+    <div class="day{% if c.today %} today{% endif %}{% if c.weekend or c.holiday %} weekend{% endif %}{% if not c.in_month %} out{% endif %}"
+         data-day="{{ c.iso }}" data-label="{{ weekdays[c.date.weekday()] }}, {{ fmt_date(c.date) }}">
+      <div class="dn"><span class="num">{{ c.date.day }}</span>{% if c.holiday %}<span class="hn" title="{{ c.holiday }}">{{ c.holiday }}</span>{% endif %}</div>
+      {{ lines(c.site_a, 'e', 'site_a', can_site_a) }}
+      {{ lines(c.site_b, 'w', 'site_b', can_site_b) }}
+      {% for p in c.legacy %}<button type="button" class="ln n" data-branch="" data-staff="{{ p.id }}" title="{{ p.name }}: no site chosen">{{ p.name|short }}</button>{% endfor %}
+    </div>
+  {% endfor %}
+</div>
+</div>
+<div class="legend">
+  <span><i class="bar-e"></i>Site A</span><span><i class="bar-w"></i>Site B</span>
+  <span><i class="box-co"></i>Weekends and public holidays</span><span><i class="box-today"></i>Today</span>
+</div>
+
+<form method="post" id="frm-quick-assign" action="{{ url_for('schedule_assign') }}" hidden>
+  <input type="hidden" name="_csrf" value="{{ csrf() }}">
+  <input type="hidden" name="view" value="{{ view }}">
+  <input type="hidden" name="d" value="{{ anchor.isoformat() }}">
+  <input type="hidden" name="day">
+  <input type="hidden" name="staff_id">
+  <input type="hidden" name="branch">
+  <input type="hidden" name="remove">
+</form>
+<form method="post" id="frm-bulk" action="{{ url_for('schedule_bulk') }}" hidden>
+  <input type="hidden" name="_csrf" value="{{ csrf() }}">
+  <input type="hidden" name="view" value="{{ view }}">
+  <input type="hidden" name="d" value="{{ anchor.isoformat() }}">
+  <input type="hidden" name="days">
+  <input type="hidden" name="staff_id">
+  <input type="hidden" name="branch">
+</form>
+<form method="post" id="frm-swap" action="{{ url_for('schedule_swap') }}" hidden>
+  <input type="hidden" name="_csrf" value="{{ csrf() }}">
+  <input type="hidden" name="view" value="{{ view }}">
+  <input type="hidden" name="d" value="{{ anchor.isoformat() }}">
+  <input type="hidden" name="a">
+  <input type="hidden" name="b">
+  <input type="hidden" name="branch">
+</form>
+
+<dialog id="dlg-assign">
+  <form method="post" action="{{ url_for('schedule_assign') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf() }}">
+    <input type="hidden" name="view" value="{{ view }}">
+    <input type="hidden" name="d" value="{{ anchor.isoformat() }}">
+    <input type="hidden" name="day" id="assign-day">
+    <input type="hidden" name="branch" id="assign-branch">
+    <h2>Assign duty</h2>
+    <p class="muted" id="assign-label"></p>
+    <input type="hidden" name="mode" value="set">
+    <p class="muted small">Tick one or more people. All of them appear on the public page.</p>
+    <fieldset class="picklist" id="assign-list">
+      {% for s in site_a_staff %}<label class="chk" data-branch="site_a"><input type="checkbox" name="staff_ids" value="{{ s.id }}"> {{ s.name }}</label>{% endfor %}
+      {% for s in site_b_staff %}<label class="chk" data-branch="site_b"><input type="checkbox" name="staff_ids" value="{{ s.id }}"> {{ s.name }}</label>{% endfor %}
+    </fieldset>
+    <p class="muted small" id="assign-legacy" hidden>This is an old entry (no site): saving removes it.</p>
+    <div class="dlg-actions">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-import">
+  <form method="post" action="{{ url_for('schedule_import') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf() }}">
+    <input type="hidden" name="step" value="preview">
+    <h2>Paste list</h2>
+    <p class="muted small">Paste lines: date and name (date as 2026-11-02, 02.11.2026 or 02/11/2026). The site (Site A or Site B) is taken from the person. At most 366 lines. A preview comes first, nothing is saved.</p>
+    <label>List
+      <textarea name="text" rows="9" required placeholder="02.11.2026&#9;Person 1"></textarea>
+    </label>
+    <div class="dlg-actions">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Preview</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-export">
+  <form method="get" action="{{ url_for('export_xlsx') }}">
+    <h2>Export to Excel</h2>
+    <p class="muted small">Downloads a file of the duty days: date, day, site, name, phone.</p>
+    <div class="two">
+      <label>From <input type="date" name="from" required value="{{ range_from.isoformat() }}"></label>
+      <label>To <input type="date" name="to" required value="{{ range_to.isoformat() }}"></label>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Download</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-range">
+  <form method="post" action="{{ url_for('schedule_range') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf() }}">
+    <input type="hidden" name="view" value="{{ view }}">
+    <input type="hidden" name="d" value="{{ anchor.isoformat() }}">
+    <h2>Assign period</h2>
+    <label>Person
+      <select name="staff_id" required>
+        <option value="" disabled selected>Choose</option>
+        {{ staff_options(false) }}
+      </select>
+    </label>
+    <div class="two">
+      <label>From <input type="date" name="from" required value="{{ today.isoformat() }}"></label>
+      <label>To <input type="date" name="to" required value="{{ today.isoformat() }}"></label>
+    </div>
+    <p class="muted small">Every day in the period (weekends and holidays included) is assigned to this person, on the line of their own site.</p>
+    <div class="dlg-actions">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

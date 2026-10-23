@@ -1,0 +1,116 @@
+{% extends "admin_base.html" %}
+{% block title %}Staff{% endblock %}
+{% block content %}
+<header class="bar">
+  <h1>Staff</h1>
+  <div class="actions">
+    <button class="btn" type="button" data-open="dlg-staff-import">Paste list</button>
+    <button class="btn primary" type="button" data-open="dlg-staff" data-new>Add a person</button>
+  </div>
+</header>
+
+{% if warn_days %}
+  <p class="alert warn" role="alert">Inactive people still have upcoming duty days: {{ warn_days }} day(s) in total. Reassign them in the schedule.</p>
+{% endif %}
+
+<div class="card flush">
+  <table class="table">
+    <thead><tr><th>Full name</th><th>Phone</th><th>Site</th><th class="nowrap">Upcoming days</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for s in staff %}
+      {% set c = counts.get(s.id) %}
+      {% set future = (c.future if c else 0) or 0 %}
+      {% set past = (c.past if c else 0) or 0 %}
+      <tr class="{{ '' if s.active else 'off' }}">
+        <td data-label="Name"><b>{{ s.name }}</b></td>
+        <td data-label="Phone"><span class="nowrap">{{ fmt_phone(s.phone) or '—' }}</span></td>
+        <td data-label="Site">
+          <div class="swx" data-id="{{ s.id }}" data-name="{{ s.name }}" data-branch="{{ s.branch }}" data-future="{{ future }}">
+            <button type="button" class="lb e{{ ' on' if s.branch == 'site_a' }}" data-b="site_a">Site A</button>
+            <button type="button" class="trk {{ 'se' if s.branch == 'site_a' else ('sw' if s.branch == 'site_b' else '') }}" aria-label="Switch site"><span class="kn"></span></button>
+            <button type="button" class="lb w{{ ' on' if s.branch == 'site_b' }}" data-b="site_b">Site B</button>
+          </div>
+          {% if not s.branch %}<span class="pill warn">No site chosen</span>{% endif %}
+        </td>
+        <td data-label="Upcoming days" class="nowrap"><b title="Past days: {{ past }}">{{ future }}</b></td>
+        <td data-label="Status">
+          {% if s.active %}<span class="pill ok">Active</span>
+          {% else %}<span class="pill soft">Inactive</span>
+            {% if future %}<br><span class="pill warn">Inactive but has {{ future }} upcoming day(s)</span>{% endif %}
+          {% endif %}
+        </td>
+        <td class="end">
+          <div class="actions">
+            <button class="btn" type="button" data-open="dlg-staff" data-id="{{ s.id }}" data-name="{{ s.name }}"
+                    data-phone="{{ s.phone }}">Edit</button>
+            <form method="post" action="{{ url_for('staff_toggle', sid=s.id) }}">
+              <input type="hidden" name="_csrf" value="{{ csrf() }}">
+              <button class="btn" type="submit">{{ 'Deactivate' if s.active else 'Activate' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('staff_delete', sid=s.id) }}"
+                  data-confirm="&quot;{{ s.name }}&quot; will be deleted permanently. Upcoming duty: {{ future }} day(s) (they become empty), past duty: {{ past }} day(s) (removed from the history). If the person is only away for a while, deactivate them instead. Continue?">
+              <input type="hidden" name="_csrf" value="{{ csrf() }}">
+              <button class="btn danger" type="submit">Delete</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6" class="muted">No people have been added yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<dialog id="dlg-staff">
+  <form method="post" action="{{ url_for('staff_save') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf() }}">
+    <input type="hidden" name="id" id="staff-id">
+    <h2 id="staff-title">Person</h2>
+    <label>Full name <input name="name" id="staff-name" required maxlength="80"></label>
+    <label>Phone <input name="phone" id="staff-phone" type="tel" maxlength="30" placeholder="555 0100"></label>
+    <label id="staff-branch-row"{% if my_scope %} hidden data-fixed{% endif %}>Site
+      <select name="branch" id="staff-branch">
+        <option value="">— not chosen yet —</option>
+        <option value="site_a">Site A</option>
+        <option value="site_b">Site B</option>
+      </select>
+    </label>
+    <div class="dlg-actions">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-branch">
+  <form method="post" id="frm-branch" action="" data-url="{{ url_for('staff_branch', sid=0) }}">
+    <input type="hidden" name="_csrf" value="{{ csrf() }}">
+    <input type="hidden" name="branch" id="br-value">
+    <h2>Change of site</h2>
+    <p>Are you sure you want to change the site of the selected person?</p>
+    <p><b id="br-who"></b></p>
+    <p class="alert warn" id="br-future" hidden></p>
+    <div class="dlg-actions">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Confirm</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-staff-import">
+  <form method="post" action="{{ url_for('staff_import') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf() }}">
+    <input type="hidden" name="step" value="preview">
+    <h2>Paste list</h2>
+    <p class="muted small">One line per person: full name, phone, site (Site A or Site B). Everything after the name is optional. At most 200 lines. A preview comes first, nothing is saved.</p>
+    <label>List
+      <textarea name="text" rows="9" required placeholder="Jane Doe&#9;555 0100&#9;Site A"></textarea>
+    </label>
+    <div class="dlg-actions">
+      <button class="btn" type="button" data-close>Cancel</button>
+      <button class="btn primary" type="submit">Preview</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

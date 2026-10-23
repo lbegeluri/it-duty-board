@@ -1,0 +1,43 @@
+{% extends "admin_base.html" %}
+{% block title %}Staff import{% endblock %}
+{% block content %}
+<header class="bar"><h1>Staff import</h1></header>
+
+<p class="muted">Check the list. Nothing has been changed yet; the people are added after you confirm.</p>
+
+{% if bad %}
+<section class="card warnbox" aria-label="Skipped lines">
+  <h2>Skipped lines: {{ bad|length }}</h2>
+  <ul class="badlist">
+    {% for no, raw, reason in bad %}
+      <li><b>Line {{ no }}</b> · <code>{{ raw }}</code> <span class="muted">{{ reason }}</span></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="card flush">
+  <table class="table">
+    <thead><tr><th>Full name</th><th>Phone</th><th>Site</th></tr></thead>
+    <tbody>
+      {% for name, phone, branch in rows %}
+        <tr>
+          <td data-label="Name"><b>{{ name }}</b></td>
+          <td data-label="Phone">{{ fmt_phone(phone) or '—' }}</td>
+          <td data-label="Site">{{ branch_name[branch] if branch else '—' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="3" class="muted">There is nobody to add.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<form method="post" action="{{ url_for('staff_import') }}" class="import-actions">
+  <input type="hidden" name="_csrf" value="{{ csrf() }}">
+  <input type="hidden" name="step" value="confirm">
+  <input type="hidden" name="text" value="{{ text }}">
+  <button class="btn primary" type="submit" {% if not rows %}disabled{% endif %}>Confirm ({{ rows|length }} people)</button>
+  <a class="btn" href="{{ url_for('staff_list') }}">Cancel</a>
+</form>
+{% endblock %}

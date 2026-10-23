@@ -1,0 +1,135 @@
+{% extends "admin_base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<header class="bar"><h1>Users</h1></header>
+
+{% if new_password %}
+  <div class="card notice" role="status">
+    <h2>Temporary password: {{ for_user }}</h2>
+    <p class="secret" id="secret">{{ new_password }}</p>
+    <p class="muted">Shown only once. The user must change it at the first login. Hand it over by a safe channel.</p>
+  </div>
+{% endif %}
+{% if error %}<p class="alert danger" role="alert">{{ error }}</p>{% endif %}
+
+<div class="card flush">
+  <table class="table">
+    <thead><tr><th>User</th><th>Name</th><th>Role</th><th>Site</th><th>Status</th><th>Last login</th><th>IP / host</th><th></th></tr></thead>
+    <tbody>
+    {% for u in users %}
+      <tr class="{{ '' if u.active else 'off' }}">
+        <td data-label="User"><b>{{ u.username }}</b></td>
+        <td data-label="Name">{{ u.display_name }}</td>
+        <td data-label="Role">{{ 'Owner' if u.role == 'owner' else 'Administrator' }}</td>
+        <td data-label="Site">
+          {% if u.role == 'owner' %}<span class="muted">All</span>
+          {% else %}
+          <form method="post" action="{{ url_for('users_scope', uid=u.id) }}" class="scope-form">
+            <input type="hidden" name="_csrf" value="{{ csrf() }}">
+            <select name="branch" aria-label="Site" data-autosubmit>
+              <option value="" {{ 'selected' if not u.branch }}>Both sites</option>
+              <option value="site_a" {{ 'selected' if u.branch == 'site_a' }}>Site A</option>
+              <option value="site_b" {{ 'selected' if u.branch == 'site_b' }}>Site B</option>
+            </select>
+          </form>
+          {% endif %}
+        </td>
+        <td data-label="Status">
+          {% if not u.active %}<span class="pill soft">Disabled</span>
+          {% elif u.id in locked %}<span class="pill warn">Locked</span>
+          {% elif u.must_change %}<span class="pill soft">Must change password</span>
+          {% else %}<span class="pill ok">Active</span>{% endif %}
+        </td>
+        <td data-label="Last login">{{ fmt_datetime(u.last_login) }}</td>
+        <td data-label="IP / host"><span class="nowrap">{{ u.last_ip or '—' }}</span>{% if host_for(u.last_ip) %}<br><span class="muted small">{{ host_for(u.last_ip) }}</span>{% endif %}</td>
+        <td class="end actions">
+          {% if u.id != user.id %}
+            <form method="post" action="{{ url_for('users_reset', uid=u.id) }}" data-confirm="{{ u.username }}'s password will be reset and a new temporary password issued. Continue?">
+              <input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="btn" type="submit">Reset password</button>
+            </form>
+            {% if u.id in locked %}
+            <form method="post" action="{{ url_for('users_unlock', uid=u.id) }}">
+              <input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="btn" type="submit">Unlock</button>
+            </form>
+            {% endif %}
+            <form method="post" action="{{ url_for('users_toggle', uid=u.id) }}">
+              <input type="hidden" name="_csrf" value="{{ csrf() }}">
+              <button class="btn" type="submit">{{ 'Disable' if u.active else 'Enable' }}</button>
+            </form>
+          {% else %}<span class="muted">You</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if locks %}
+<h2 class="section">Locked computers <span class="muted small">after failed attempts this user is temporarily blocked from that computer</span></h2>
+<div class="card flush" id="locked-list">
+  <table class="table">
+    <thead><tr><th>User</th><th>IP / host</th><th>Locked until</th><th></th></tr></thead>
+    <tbody>
+    {% for l in locks %}
+      <tr>
+        <td data-label="User"><b>{{ l.username }}</b></td>
+        <td data-label="IP / host"><span class="nowrap">{{ l.ip }}</span>{% if host_for(l.ip) %}<br><span class="muted small">{{ host_for(l.ip) }}</span>{% endif %}</td>
+        <td data-label="Locked until">{{ fmt_datetime(l.locked_until) }}</td>
+        <td class="end">
+          <form method="post" action="{{ url_for('locks_unlock') }}">
+            <input type="hidden" name="_csrf" value="{{ csrf() }}">
+            <input type="hidden" name="username" value="{{ l.username }}">
+            <input type="hidden" name="ip" value="{{ l.ip }}">
+            <button class="btn" type="submit">Unlock</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="muted small">If this is the real user's computer and they mistyped the password, press "Unlock". If the IP is unknown, leave it locked: it expires by itself.</p>
+{% endif %}
+
+<h2 class="section">New administrator</h2>
+<form class="card form" method="post" action="{{ url_for('users_create') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf() }}">
+  <div class="two">
+    <label>User name <input name="username" required pattern="[a-z0-9._\-]{3,32}" maxlength="32" placeholder="j.smith"></label>
+    <label>Full name <input name="display_name" required maxlength="80"></label>
+  </div>
+  <label>Site this administrator manages
+    <select name="branch">
+      <option value="">Both sites</option>
+      <option value="site_a">Site A</option>
+      <option value="site_b">Site B</option>
+    </select>
+  </label>
+  <p class="muted">A site administrator sees and manages only the people and duty days of their own site.</p>
+  <p class="muted">The system creates a temporary password and shows it once.</p>
+  <button class="btn primary" type="submit">Create</button>
+</form>
+
+<h2 class="section">Login history <span class="muted small">last 50 entries: successful and failed attempts</span></h2>
+<div class="card flush" id="login-history">
+  <table class="table">
+    <thead><tr><th>Time</th><th>User</th><th>Result</th><th>IP / host</th></tr></thead>
+    <tbody>
+    {% for r in history %}
+      <tr>
+        <td data-label="Time" class="nowrap">{{ fmt_datetime(r.ts) }}</td>
+        <td data-label="User">{{ (r.detail if r.action == 'login.failed' else r.actor) or '—' }}</td>
+        <td data-label="Result">
+          {% if r.action == 'login' %}<span class="pill ok">Login</span>
+          {% elif r.action == 'login.failed' %}<span class="pill warn">Failed attempt</span>
+          {% else %}<span class="pill warn">Account locked</span>{% endif %}
+        </td>
+        <td data-label="IP / host"><span class="nowrap">{{ r.ip or '—' }}</span>{% if host_for(r.ip) %}<br><span class="muted small">{{ host_for(r.ip) }}</span>{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="muted">There are no entries yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

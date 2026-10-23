@@ -1,0 +1,30 @@
+# =============================================================================
+# duty.conf: the ONLY file you edit before running the scripts in this folder
+# Bash syntax: NAME="value", no spaces around "=". Several networks: separate with spaces.
+# =============================================================================
+
+# This VM
+VM_IP="10.0.20.10"
+SSH_USER="ubuntu"
+TZ_NAME="UTC"                         # e.g. Europe/Berlin, America/New_York ("timedatectl list-timezones")
+
+# The site
+ITDUTY_HOST="duty.example.com"        # internal name (create the DNS record yourself, pointing to VM_IP)
+ORG_NAME="Example Organization"       # only used in the certificate request
+APP_DIR="/opt/duty"
+
+# Who may reach what
+ADMIN_SSH_NET="10.0.10.60/32"         # SSH: the admin PC only (add more networks if needed)
+WEB_NETS="10.0.0.0/16 10.1.0.0/16"    # public page: your office networks. Anything else is dropped
+BLOCK_NETS="10.0.195.0/24"            # always refused (for example the guest Wi-Fi), even if inside WEB_NETS
+ITDUTY_ADMIN_NETS="10.0.0.0/16 10.1.0.0/16"   # /admin: usually the same networks; a user name and password are required
+
+# Time sources (optional): internal NTP servers, space separated. The Ubuntu pool is always added.
+NTP_SERVERS=""
+
+# More names (optional). ITDUTY_HOST above is the main name: the site is served under it.
+# EXTRA_HOSTS   : further names that serve the site too.
+# REDIRECT_HOSTS: old names that only redirect (301, same path) to ITDUTY_HOST.
+# Every name must be in the certificate: 09-cert.sh csr puts all of them in the request.
+EXTRA_HOSTS=""
+REDIRECT_HOSTS=""

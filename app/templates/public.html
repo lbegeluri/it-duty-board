@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ site_title }}{% endblock %}
+{% block bodyclass %}pub{% endblock %}
+{% macro duty_card(cls, label, people) %}
+  <section class="duty-card" aria-label="{{ label }}">
+    <span class="tag {{ cls }}">{{ label }}</span>
+    {% for p in people %}
+      {% set ph = fmt_phone(p.phone or contact.phone) %}
+      <div class="contact-box person">
+        <span class="duty-name">{{ p.name }}</span>
+        {% if ph %}<span class="phone">{{ ph }}</span>{% endif %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <b>Not assigned</b>
+        <span>Please contact the IT department.</span>
+        {% if contact.phone %}
+        <div class="contact-box"><span class="phone">{{ fmt_phone(contact.phone) }}</span></div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </section>
+{% endmacro %}
+{% macro weeklist(days) %}
+  <div class="wk-head" aria-hidden="true"><span></span><span>Site A</span><span>Site B</span></div>
+  <ul class="wk">
+    {% for d in days %}
+      <li class="wk-row{% if d.weekend or d.holiday %} we{% endif %}{% if d.holiday %} ho{% endif %}{% if d.is_today %} today{% endif %}">
+        <span class="wk-daycell">
+          <span class="wk-tile"><b>{{ d.date.day }}</b><i>{{ weekdays_short[d.date.weekday()] }}</i></span>
+          <span class="wk-day">{% if d.is_today %}<span class="pill soft">Today</span>{% elif d.is_tomorrow %}<span class="pill soft">Tomorrow</span>{% endif %}<span class="wk-wd">{{ weekdays[d.date.weekday()] }}</span>{% if d.holiday %}<span class="hol">{{ d.holiday }}</span>{% endif %}<small>{{ fmt_date(d.date) }}</small></span>
+        </span>
+        <span class="wk-who site_a" data-b="Site A">{% for p in d.site_a %}<span class="nm">{{ p.name }}</span>{% else %}<span class="muted">Not assigned</span>{% endfor %}</span>
+        <span class="wk-who site_b" data-b="Site B">{% for p in d.site_b %}<span class="nm">{{ p.name }}</span>{% else %}<span class="muted">Not assigned</span>{% endfor %}</span>
+      </li>
+    {% endfor %}
+  </ul>
+{% endmacro %}
+{% block body %}
+<header class="hdr">
+  <div class="hdr-in">
+    <span class="hdr-logo">{% include "_logo_white.svg" %}</span>
+    <h1>{{ site_title }}</h1>
+    <p class="hdr-date">{{ weekdays[today.weekday()] }}<br>{{ fmt_date(today) }}</p>
+  </div>
+  <svg class="swoop" viewBox="0 0 800 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 40V14C160 40 340 0 520 14S720 34 800 12V40Z"/></svg>
+</header>
+<main class="pub-main" data-refresh="60">
+  <div class="now"><span class="pill ok"><i class="dot"></i>On duty now</span></div>
+  <div class="cards">
+    {{ duty_card('e', 'Site A', site_a) }}
+    {{ duty_card('w', 'Site B', site_b) }}
+  </div>
+
+  <section aria-labelledby="wk1">
+    <h2 class="wk-title" id="wk1">This week</h2>
+    {{ weeklist(this_week) }}
+  </section>
+  <section aria-labelledby="wk2">
+    <h2 class="wk-title" id="wk2">Next week</h2>
+    {{ weeklist(next_week) }}
+  </section>
+
+  <footer class="pub-foot">
+    <span class="foot-logo">{% include "_logo_teal.svg" %}</span>
+    <span>{{ site_footer }}</span>
+    <span class="muted">Last updated: {{ fmt_datetime(last_updated) }}</span>
+    <a href="{{ url_for('login') }}">Admin panel</a>
+  </footer>
+</main>
+{% endblock %}

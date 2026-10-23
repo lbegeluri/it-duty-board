@@ -1,0 +1,45 @@
+{% extends "admin_base.html" %}
+{% block title %}Import{% endblock %}
+{% block content %}
+<header class="bar"><h1>Schedule import</h1></header>
+
+<p class="muted">Check the list. Nothing has been changed yet; the duty days are saved after you confirm.</p>
+
+{% if bad %}
+<section class="card warnbox" aria-label="Skipped lines">
+  <h2>Skipped lines: {{ bad|length }}</h2>
+  <ul class="badlist">
+    {% for no, raw, reason in bad %}
+      <li><b>Line {{ no }}</b> · <code>{{ raw }}</code> <span class="muted">{{ reason }}</span></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="card flush">
+  <table class="table">
+    <thead><tr><th>Date</th><th>Day</th><th>Site</th><th>On duty</th><th>Now</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+        <tr>
+          <td data-label="Date">{{ fmt_date(r.date) }}</td>
+          <td data-label="Day">{{ weekdays[r.date.weekday()] }}</td>
+          <td data-label="Site">{{ branch_name[r.branch] }}</td>
+          <td data-label="On duty"><b>{{ r.name }}</b></td>
+          <td data-label="Now">{% if r.current %}<span class="muted">{{ r.current }}</span>{% else %}<span class="muted">empty</span>{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="muted">There is nothing to save.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<form method="post" action="{{ url_for('schedule_import') }}" class="import-actions">
+  <input type="hidden" name="_csrf" value="{{ csrf() }}">
+  <input type="hidden" name="step" value="confirm">
+  <input type="hidden" name="text" value="{{ text }}">
+  <button class="btn primary" type="submit" {% if not rows %}disabled{% endif %}>Confirm ({{ rows|length }} day(s))</button>
+  <a class="btn" href="{{ url_for('schedule') }}">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,5 @@
+Flask>=3.0,<4
+argon2-cffi>=23.1
+gunicorn>=22
+tzdata
+openpyxl>=3.1

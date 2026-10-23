@@ -1,0 +1,108 @@
+{% extends "admin_base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<header class="bar"><h1>Settings</h1></header>
+
+{% if user.must_change %}
+  <p class="alert warn" role="alert">For security, change the temporary password before you continue.</p>
+{% endif %}
+{% if error %}<p class="alert danger" role="alert">{{ error }}</p>{% endif %}
+{% if done %}<p class="alert ok" role="status">{{ done }}</p>{% endif %}
+
+<h2 class="section">Change password</h2>
+<form class="card form narrow" method="post" action="{{ url_for('settings') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf() }}">
+  <label>Current password <input name="current" type="password" autocomplete="current-password" required></label>
+  <label>New password <input name="new" type="password" autocomplete="new-password" required minlength="7"></label>
+  <label>Repeat the new password <input name="again" type="password" autocomplete="new-password" required minlength="7"></label>
+  <p class="muted">At least 7 characters: an upper-case and a lower-case letter, a digit and a symbol (e.g. ! @ # -).</p>
+  <button class="btn primary" type="submit">Change</button>
+</form>
+
+{% if user.role == 'owner' %}
+<h2 class="section">Site texts</h2>
+{% if site_error %}<p class="alert danger" role="alert">{{ site_error }}</p>{% endif %}
+<form class="card form" id="site-form" method="post" action="{{ url_for('settings_site') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf() }}">
+  <label>Title (top bar of the public page) <input name="title" required maxlength="80" value="{{ site.title }}"></label>
+  <label>Footer (bottom of the page) <input name="footer" maxlength="80" value="{{ site.footer }}"></label>
+  <label>General phone <input name="contact_phone" type="tel" maxlength="30" value="{{ site.contact_phone }}" placeholder="555 0100"></label>
+  <p class="muted">The general number is shown when nobody is assigned or the person has no number of their own.</p>
+  <button class="btn primary" type="submit">Save</button>
+</form>
+
+<h2 class="section" id="holidays">Public holidays</h2>
+<div class="card">
+  <p class="muted">The automatic list comes from app/holidays.py (fixed dates plus the Orthodox Easter days). In the schedule and on the public page these days have the weekend colour. You can add an extra day off here, and switch an automatic day off.</p>
+  <table class="table">
+    <thead><tr><th>Date</th><th>Name</th><th></th></tr></thead>
+    <tbody>
+    {% for h in custom_holidays %}
+      <tr>
+        <td data-label="Date" class="nowrap">{{ fmt_date(h.date) }}</td>
+        <td data-label="Name">{{ h.name }} <span class="pill soft">added</span></td>
+        <td class="end">
+          <form method="post" action="{{ url_for('holidays_delete') }}">
+            <input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="day" value="{{ h.day }}">
+            <button class="btn danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    {% for h in auto_holidays %}
+      <tr class="{{ 'off' if h.off }}">
+        <td data-label="Date" class="nowrap">{{ fmt_date(h.date) }}</td>
+        <td data-label="Name">{{ h.name }}{% if h.off %} <span class="pill soft">switched off</span>{% endif %}</td>
+        <td class="end">
+          <form method="post" action="{{ url_for('holidays_toggle') }}">
+            <input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="day" value="{{ h.day }}">
+            <input type="hidden" name="off" value="{{ '0' if h.off else '1' }}">
+            <button class="btn" type="submit">{{ 'Switch on' if h.off else 'Switch off' }}</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <form class="form" method="post" action="{{ url_for('holidays_add') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf() }}">
+    <div class="two">
+      <label>Date <input type="date" name="day" required></label>
+      <label>Name <input name="name" maxlength="60" placeholder="Day off"></label>
+    </div>
+    <button class="btn primary" type="submit">Add</button>
+  </form>
+</div>
+
+<h2 class="section">Data backup</h2>
+<div class="card" id="backup-box">
+  {% if backup %}
+    <p><b>Last backup:</b> {{ fmt_datetime(backup.time) }} · {{ backup.kb }} KB · <span class="muted">file: {{ backup.name }}</span></p>
+  {% else %}
+    <p class="muted">No backup has been made yet.</p>
+  {% endif %}
+  <p class="muted">The server makes a backup every night and keeps the newest 14{% if backup %} (now: {{ backup.count }}){% endif %}.</p>
+  <div class="actions">
+    <form method="post" action="{{ url_for('backup_create') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <button class="btn" type="submit">Create now</button>
+    </form>
+    <a class="btn" href="{{ url_for('backup_download') }}">Download</a>
+  </div>
+</div>
+
+<h2 class="section">Information</h2>
+<div class="card" id="info-box">
+  <p><b>Networks from which the admin panel can be opened (user name and password needed):</b> {{ info.admin_nets or '—' }}</p>
+  <p><b>Session length:</b> {{ info.session_hours }} hours</p>
+  <p class="muted">This is for information only: it is changed on the server, not here.</p>
+</div>
+{% endif %}
+
+<h2 class="section">Account</h2>
+<div class="card">
+  <p><b>{{ user.display_name }}</b> · {{ user.username }}</p>
+  <p class="muted">Role: {{ 'owner' if user.role == 'owner' else 'administrator' }}.
+     If you forget your password, ask the owner (admin). You can only change your own password.</p>
+</div>
+{% endblock %}

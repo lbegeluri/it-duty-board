@@ -1,0 +1,74 @@
+{% extends "admin_base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<header class="bar">
+  <h1>Audit log</h1>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('audit_export', user=f.user, action=f.action, q=f.q, **{'from': f['from'], 'to': f['to']}) }}">Export to Excel</a>
+  </div>
+</header>
+
+<form class="card filters" method="get" action="{{ url_for('audit_log') }}">
+  <label>User
+    <select name="user"><option value="">All</option>{% for u in users %}<option value="{{ u }}" {{ 'selected' if f.user == u }}>{{ u }}</option>{% endfor %}</select>
+  </label>
+  <label>Action
+    <select name="action"><option value="">All</option>{% for a in actions %}<option value="{{ a }}" {{ 'selected' if f.action == a }}>{{ a }}</option>{% endfor %}</select>
+  </label>
+  <label>From <input type="date" name="from" value="{{ f['from'] }}"></label>
+  <label>To <input type="date" name="to" value="{{ f['to'] }}"></label>
+  <label>Search in details <input type="search" name="q" value="{{ f.q }}" maxlength="80"></label>
+  <div class="filter-actions">
+    <button class="btn primary" type="submit">Filter</button>
+    {% if filtered %}<a class="btn" href="{{ url_for('audit_log') }}">Clear</a>{% endif %}
+  </div>
+</form>
+
+{% if user.role == 'owner' %}
+<details class="card delpanel">
+  <summary>Delete entries (owner only)</summary>
+  <p class="muted">Deleting is permanent and leaves no trace: nothing about it is written to the log.</p>
+  <div class="actions">
+    <button class="btn danger" type="submit" form="frm-del-sel" data-confirm="The selected entries will be deleted permanently. Continue?">Delete selected</button>
+    {% if filtered %}
+    <form method="post" action="{{ url_for('audit_delete') }}" data-confirm="The {{ total }} entries that match the filter will be deleted permanently. Continue?">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="mode" value="filtered">
+      <input type="hidden" name="user" value="{{ f.user }}"><input type="hidden" name="action" value="{{ f.action }}">
+      <input type="hidden" name="q" value="{{ f.q }}"><input type="hidden" name="from" value="{{ f['from'] }}"><input type="hidden" name="to" value="{{ f['to'] }}">
+      <button class="btn danger" type="submit">Delete all entries of the filter ({{ total }})</button>
+    </form>
+    {% endif %}
+  </div>
+  <form class="delall" method="post" action="{{ url_for('audit_delete') }}">
+    <input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="mode" value="all">
+    <label>To delete everything type the word <b>delete</b>
+      <input name="word" autocomplete="off" required></label>
+    <button class="btn danger" type="submit">Delete the whole log</button>
+  </form>
+</details>
+<form method="post" id="frm-del-sel" action="{{ url_for('audit_delete') }}" hidden>
+  <input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="mode" value="selected">
+</form>
+{% endif %}
+
+<p class="muted">Found: {{ total }} entries{% if total > rows|length %}, showing the newest {{ rows|length }}{% endif %}.</p>
+<div class="card flush">
+  <table class="table">
+    <thead><tr>{% if user.role == 'owner' %}<th class="sel"><input type="checkbox" id="sel-all" aria-label="Select all"></th>{% endif %}<th>Time</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        {% if user.role == 'owner' %}<td class="sel"><input type="checkbox" class="sel-row" name="ids" value="{{ r.id }}" form="frm-del-sel" aria-label="Select"></td>{% endif %}
+        <td data-label="Time" class="nowrap">{{ fmt_datetime(r.ts) }}</td>
+        <td data-label="User">{{ r.actor }}</td>
+        <td data-label="Action"><code>{{ r.action }}</code></td>
+        <td data-label="Details">{{ r.detail }}</td>
+        <td data-label="IP" class="nowrap muted">{{ r.ip or '—' }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="6" class="muted">{{ 'No entries found.' if filtered else 'There are no entries yet.' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
